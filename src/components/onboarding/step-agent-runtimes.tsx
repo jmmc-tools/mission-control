@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Button } from '@/components/ui/button'
 import { Loader } from '@/components/ui/loader'
+import { RuntimeSetupModal } from './runtime-setup-modal'
 
 interface RuntimeStatus {
   id: string
@@ -43,6 +44,8 @@ export function StepAgentRuntimes({ isGateway, onNext, onBack }: Props) {
   const [loading, setLoading] = useState(true)
   const [activeJobs, setActiveJobs] = useState<Record<string, InstallJob>>({})
   const [copiedYaml, setCopiedYaml] = useState<string | null>(null)
+  const [setupRuntime, setSetupRuntime] = useState<'openclaw' | 'hermes' | null>(null)
+  const [setupCompleted, setSetupCompleted] = useState<Set<string>>(new Set())
 
   const fetchRuntimes = useCallback(async () => {
     try {
@@ -191,6 +194,22 @@ export function StepAgentRuntimes({ isGateway, onNext, onBack }: Props) {
                   </p>
                 )}
 
+                {/* Post-install setup button for openclaw/hermes */}
+                {(rt.installed || justInstalled) && (rt.id === 'openclaw' || rt.id === 'hermes') && !setupCompleted.has(rt.id) && (
+                  <div className="mt-2">
+                    <button
+                      onClick={() => setSetupRuntime(rt.id as 'openclaw' | 'hermes')}
+                      className="text-2xs px-2 py-1 rounded border border-primary/30 bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
+                    >
+                      Set Up {rt.name}
+                    </button>
+                  </div>
+                )}
+
+                {(rt.installed || justInstalled) && setupCompleted.has(rt.id) && (
+                  <p className="text-2xs text-green-400/70 mt-1">Setup complete</p>
+                )}
+
                 {/* Install actions */}
                 {!rt.installed && !justInstalled && (
                   <div className="mt-2">
@@ -240,6 +259,19 @@ export function StepAgentRuntimes({ isGateway, onNext, onBack }: Props) {
           Continue
         </Button>
       </div>
+
+      {/* Post-install setup modals */}
+      {setupRuntime && (
+        <RuntimeSetupModal
+          runtime={setupRuntime}
+          onClose={() => setSetupRuntime(null)}
+          onComplete={() => {
+            setSetupCompleted(prev => new Set([...prev, setupRuntime]))
+            setSetupRuntime(null)
+            fetchRuntimes()
+          }}
+        />
+      )}
     </>
   )
 }

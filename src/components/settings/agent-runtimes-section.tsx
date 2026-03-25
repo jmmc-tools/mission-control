@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Button } from '@/components/ui/button'
 import { Loader } from '@/components/ui/loader'
+import { RuntimeSetupModal } from '@/components/onboarding/runtime-setup-modal'
 
 interface RuntimeStatus {
   id: string
@@ -34,6 +35,7 @@ export function AgentRuntimesSection({ showFeedback }: Props) {
   const [loading, setLoading] = useState(true)
   const [activeJobs, setActiveJobs] = useState<Record<string, InstallJob>>({})
   const [expandedOutput, setExpandedOutput] = useState<string | null>(null)
+  const [setupRuntime, setSetupRuntime] = useState<'openclaw' | 'hermes' | null>(null)
 
   const fetchRuntimes = useCallback(async () => {
     try {
@@ -231,6 +233,16 @@ export function AgentRuntimesSection({ showFeedback }: Props) {
                 </p>
               )}
 
+              {/* Post-install setup for openclaw/hermes */}
+              {rt.installed && (rt.id === 'openclaw' || rt.id === 'hermes') && (
+                <button
+                  onClick={() => setSetupRuntime(rt.id as 'openclaw' | 'hermes')}
+                  className="text-2xs mt-1.5 px-2 py-1 rounded border border-primary/30 bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
+                >
+                  Configure {rt.name}
+                </button>
+              )}
+
               {/* Active install job output */}
               {job && (
                 <div className="mt-2">
@@ -264,6 +276,19 @@ export function AgentRuntimesSection({ showFeedback }: Props) {
           )
         })}
       </div>
+
+      {/* Post-install setup modals */}
+      {setupRuntime && (
+        <RuntimeSetupModal
+          runtime={setupRuntime}
+          onClose={() => setSetupRuntime(null)}
+          onComplete={() => {
+            setSetupRuntime(null)
+            fetchRuntimes()
+            showFeedback(true, `${setupRuntime === 'openclaw' ? 'OpenClaw' : 'Hermes'} setup complete`)
+          }}
+        />
+      )}
     </div>
   )
 }
