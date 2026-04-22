@@ -10,6 +10,7 @@ interface NavItem {
   label: string
   icon: React.ReactNode
   priority: boolean // Show in mobile bottom bar
+  essential?: boolean // Visible in Essential interface mode
 }
 
 interface NavGroup {
@@ -36,7 +37,7 @@ const navGroups: NavGroup[] = [
       { id: 'logs', label: 'Logs', icon: <LogsIcon />, priority: true },
       { id: 'tokens', label: 'Tokens', icon: <TokensIcon />, priority: false },
       { id: 'memory', label: 'Memory', icon: <MemoryIcon />, priority: false },
-      { id: 'workspace', label: 'Workspace', icon: <WorkspaceIcon />, priority: false },
+      { id: 'workspace', label: 'Workspace', icon: <WorkspaceIcon />, priority: false, essential: true },
     ],
   },
   {

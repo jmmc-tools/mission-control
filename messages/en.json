@@ -740,6 +740,7 @@
     "workspaceFilesDesc": "Files in the agent workspace directory."
   },
   "taskBoard": {
+    "taskBoard": "Task Board",
     "title": "Task Board",
     "allProjects": "All Projects",
     "projects": "Projects",
