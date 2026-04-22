@@ -1,0 +1,3 @@
+{
+  "docker.commands.build": "docker build --platform linux/amd64 ${dockerfile} ${tag} ${context}"
+}
