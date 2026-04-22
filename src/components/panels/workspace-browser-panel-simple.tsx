@@ -120,9 +120,13 @@ export function WorkspaceBrowserPanel() {
         return
       }
       
-      if (data.type === 'file' && data.content !== undefined) {
+      // API returns { content, ... } for files, { entries: [...] } for directories
+      if (data.content !== undefined) {
         setSelectedFile(filePath)
         setFileContent(data.content)
+      } else if (data.entries) {
+        // It's a directory, not a file - should not happen if called correctly
+        log.warn('Tried to load directory as file:', filePath)
       }
     } catch (error) {
       log.error('Failed to load file content:', error)
