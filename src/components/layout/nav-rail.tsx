@@ -48,6 +48,7 @@ const navGroups: NavGroup[] = [
       { id: 'exec-approvals', label: 'Approvals', icon: <ApprovalsIcon />, priority: false },
       { id: 'office', label: 'Office', icon: <OfficeIcon />, priority: false },
       { id: 'monitor', label: 'Monitor', icon: <MonitorIcon />, priority: false },
+      { id: 'workspace', label: 'Workspace', icon: <WorkspaceIcon />, priority: false, essential: true },
     ],
   },
   {
@@ -1520,6 +1521,16 @@ function MonitorIcon() {
       <rect x="1" y="2" width="14" height="10" rx="1.5" />
       <polyline points="4,9 6,6 8,8 12,4" />
       <path d="M5 14h6" />
+    </svg>
+  )
+}
+
+function WorkspaceIcon() {
+  return (
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M2 4.5v8c0 .8.7 1.5 1.5 1.5h9c.8 0 1.5-.7 1.5-1.5v-8" />
+      <path d="M1 4.5L8 2l7 2.5" />
+      <path d="M5 7h6M5 10h4" />
     </svg>
   )
 }
