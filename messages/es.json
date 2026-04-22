@@ -85,6 +85,7 @@
     "channels": "Canales",
     "skills": "Habilidades",
     "memory": "Memoria",
+    "workspace": "Espacio de trabajo",
     "activity": "Actividad",
     "logs": "Registros",
     "costTracker": "Seguimiento de costos",
@@ -740,6 +741,7 @@
     "workspaceFilesDesc": "Archivos del workspace del agente"
   },
   "taskBoard": {
+    "taskBoard": "Tablero de tareas",
     "title": "Tablero de tareas",
     "allProjects": "Todos los proyectos",
     "projects": "Proyectos",
