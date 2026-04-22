@@ -19,14 +19,13 @@ export const MODEL_CATALOG: ModelConfig[] = [
   // Google
   { alias: 'gemini-2.5-pro', name: 'google/gemini-2.5-pro', provider: 'google', description: 'Gemini 2.5 Pro', costPer1k: 1.25 },
   { alias: 'gemini-2.5-flash', name: 'google/gemini-2.5-flash', provider: 'google', description: 'Gemini 2.5 Flash, fast', costPer1k: 0.15 },
-  // Local / open-source
-  { alias: 'deepseek', name: 'ollama/deepseek-r1:14b', provider: 'ollama', description: 'Local reasoning (free)', costPer1k: 0.0 },
-  // Groq (hosted inference)
-  { alias: 'groq-fast', name: 'groq/llama-3.1-8b-instant', provider: 'groq', description: '840 tok/s, ultra fast', costPer1k: 0.05 },
-  { alias: 'groq', name: 'groq/llama-3.3-70b-versatile', provider: 'groq', description: 'Fast + quality balance', costPer1k: 0.59 },
+  // Local Ollama models (must match openclaw config whitelist)
+  { alias: 'qwen7b', name: 'ollama/qwen2.5:7b', provider: 'ollama', description: 'Qwen 2.5 7B (local, fast)', costPer1k: 0.0 },
+  { alias: 'qwen14b', name: 'ollama/qwen2.5:14b', provider: 'ollama', description: 'Qwen 2.5 14B (local, quality)', costPer1k: 0.0 },
+  { alias: 'llama8b', name: 'ollama/llama3.1:8b', provider: 'ollama', description: 'Llama 3.1 8B (local)', costPer1k: 0.0 },
+  { alias: 'mistral7b', name: 'ollama/mistral:7b', provider: 'ollama', description: 'Mistral 7B (local)', costPer1k: 0.0 },
   // Other providers
   { alias: 'kimi', name: 'moonshot/kimi-k2.5', provider: 'moonshot', description: 'Alternative provider', costPer1k: 1.0 },
-  { alias: 'venice-llama-3.3-70b', name: 'venice/llama-3.3-70b', provider: 'venice', description: 'Venice AI Llama 3.3 70B', costPer1k: 0.7 },
   { alias: 'minimax', name: 'minimax/minimax-m2.1', provider: 'minimax', description: 'Cost-effective, strong coding', costPer1k: 0.3 },
 ]
 
