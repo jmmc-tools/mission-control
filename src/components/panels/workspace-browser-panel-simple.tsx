@@ -16,6 +16,16 @@ interface WorkspaceFile {
   children?: WorkspaceFile[]
 }
 
+interface FileTaskInfo {
+  file_path: string
+  created_by_task: {
+    task_id: number
+    task_title: string
+    task_status: string
+    created_at: number
+  } | null
+}
+
 function formatFileSize(bytes: number): string {
   if (bytes === 0) return '0 B'
   const k = 1024
@@ -43,6 +53,7 @@ export function WorkspaceBrowserPanel() {
   const [files, setFiles] = useState<WorkspaceFile[]>([])
   const [selectedFile, setSelectedFile] = useState<string | null>(null)
   const [fileContent, setFileContent] = useState<string | null>(null)
+  const [fileTaskInfo, setFileTaskInfo] = useState<FileTaskInfo | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set())
   const [error, setError] = useState<string | null>(null)
@@ -124,6 +135,8 @@ export function WorkspaceBrowserPanel() {
       if (data.content !== undefined) {
         setSelectedFile(filePath)
         setFileContent(data.content)
+        // Cargar información de la tarea que creó este archivo
+        loadFileTaskInfo(filePath)
       } else if (data.entries) {
         // It's a directory, not a file - should not happen if called correctly
         log.warn('Tried to load directory as file:', filePath)
@@ -133,6 +146,22 @@ export function WorkspaceBrowserPanel() {
       setError(error instanceof Error ? error.message : 'Failed to load file')
     } finally {
       setIsLoading(false)
+    }
+  }
+
+  const loadFileTaskInfo = async (filePath: string) => {
+    try {
+      const response = await fetch(`/api/workspace/file-info?path=${encodeURIComponent(filePath)}`)
+      if (!response.ok) {
+        log.warn('Failed to load file task info:', response.status)
+        return
+      }
+      
+      const data = await response.json()
+      setFileTaskInfo(data)
+    } catch (error) {
+      log.error('Failed to load file task info:', error)
+      // No es crítico, solo no mostramos la información
     }
   }
 
@@ -268,10 +297,31 @@ export function WorkspaceBrowserPanel() {
                   <code>{fileContent}</code>
                 </pre>
                 
-                {/* TODO: Botón "Ver tarea relacionada" cuando tengamos metadata */}
-                <div className="mt-4 p-3 bg-gray-900 rounded-lg text-sm text-gray-400">
-                  💡 Futuro: Aquí se mostrará la tarea que creó este archivo
-                </div>
+                {/* Información de la tarea que creó este archivo */}
+                {fileTaskInfo?.created_by_task ? (
+                  <div className="mt-4 p-3 bg-blue-900/20 border border-blue-500/30 rounded-lg text-sm">
+                    <div className="flex items-center gap-2 text-blue-300">
+                      <span className="text-lg">🔗</span>
+                      <span>
+                        Creado por{' '}
+                        <a
+                          href={`/tasks?taskId=${fileTaskInfo.created_by_task.task_id}`}
+                          className="font-semibold text-blue-400 hover:text-blue-300 underline"
+                        >
+                          Task #{fileTaskInfo.created_by_task.task_id}: {fileTaskInfo.created_by_task.task_title}
+                        </a>
+                      </span>
+                    </div>
+                    <div className="text-xs text-gray-400 mt-1">
+                      Estado: {fileTaskInfo.created_by_task.task_status} · {' '}
+                      {new Date(fileTaskInfo.created_by_task.created_at * 1000).toLocaleString()}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="mt-4 p-3 bg-gray-900 rounded-lg text-sm text-gray-400">
+                    💡 Este archivo no está vinculado a ninguna tarea
+                  </div>
+                )}
               </div>
             ) : (
               <div className="text-gray-500">No se pudo cargar el contenido</div>
