@@ -8,6 +8,8 @@ import { logger } from '@/lib/logger'
 import { scanForInjection, sanitizeForPrompt } from '@/lib/injection-guard'
 import { callOpenClawGateway } from '@/lib/openclaw-gateway'
 import { resolveCoordinatorDeliveryTarget } from '@/lib/coordinator-routing'
+import { config as mcConfig } from '@/lib/config'
+import { getDetectedGatewayToken } from '@/lib/gateway-runtime'
 
 type ForwardInfo = {
   attempted: boolean
@@ -109,6 +111,71 @@ function createChatReply(
     ...row,
     metadata: safeParseMetadata(row.metadata),
   })
+}
+
+/**
+ * Call the openclaw HTTP /v1/chat/completions endpoint and return the assistant reply text.
+ * Uses model="openclaw" (default gateway agent) or "openclaw/<openclawId>" for named agents.
+ * Falls back to "openclaw" when the specific agent model returns an error.
+ */
+async function callOpenClawCompletionsHttp(
+  conversationHistory: Array<{ role: 'user' | 'assistant'; content: string }>,
+  openclawAgentId: string | null,
+  timeoutMs = 25000,
+): Promise<string | null> {
+  const host = mcConfig.gatewayHost || '127.0.0.1'
+  const port = mcConfig.gatewayPort || 18789
+  const token = getDetectedGatewayToken()
+  const baseUrl = `http://${host}:${port}`
+
+  const models = openclawAgentId
+    ? [`openclaw/${openclawAgentId}`, 'openclaw']
+    : ['openclaw']
+
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  }
+
+  for (const model of models) {
+    try {
+      const controller = new AbortController()
+      const timer = setTimeout(() => controller.abort(), timeoutMs)
+
+      let response: Response
+      try {
+        response = await fetch(`${baseUrl}/v1/chat/completions`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({
+            model,
+            messages: conversationHistory,
+            stream: false,
+            max_tokens: 2048,
+          }),
+          signal: controller.signal,
+        })
+      } finally {
+        clearTimeout(timer)
+      }
+
+      const data = await response.json()
+      if (!response.ok) {
+        // "model not found" or "invalid model" — try next
+        logger.warn({ model, status: response.status, data }, 'callOpenClawCompletionsHttp: model attempt failed')
+        continue
+      }
+
+      const text = data?.choices?.[0]?.message?.content
+      if (typeof text === 'string' && text.trim()) {
+        return text.trim()
+      }
+    } catch (err) {
+      logger.warn({ err, model }, 'callOpenClawCompletionsHttp: request failed')
+    }
+  }
+
+  return null
 }
 
 function extractReplyText(waitPayload: any): string | null {
@@ -465,26 +532,14 @@ export async function POST(request: NextRequest) {
         // Prefer configured openclawId when present, fallback to normalized name
         let openclawAgentId: string | null = coordinatorResolution.openclawAgentId
 
+        // When there's neither a session nor a named agent, fall back to the gateway
+        // default agent (openclawAgentId = 'default') so completions still work.
         if (!sessionKey && !openclawAgentId) {
-          forwardInfo.reason = 'no_active_session'
+          openclawAgentId = null // will use model="openclaw" (default agent)
+        }
 
-          // For coordinator messages, emit an immediate visible status reply
-          if (typeof conversation_id === 'string' && conversation_id.startsWith('coord:')) {
-            try {
-                createChatReply(
-                  db,
-                  workspaceId,
-                  conversation_id,
-                  COORDINATOR_AGENT,
-                  from,
-                  'I received your message, but my live coordinator session is offline right now. Start/restore the coordinator session and retry.',
-                  'status',
-                  { status: 'offline', reason: 'no_active_session' }
-                )
-            } catch (e) {
-              logger.error({ err: e }, 'Failed to create offline status reply')
-            }
-          }
+        if (false) {
+          // kept for symmetry — the block below handles all cases now
         } else {
           try {
             const idempotencyKey = `mc-${messageId}-${Date.now()}`
@@ -508,31 +563,66 @@ export async function POST(request: NextRequest) {
                 forwardInfo.runId = acceptedPayload.runId
               }
             } else {
-              const invokeParams: any = {
-                message: `Message from ${from}: ${content}`,
-                idempotencyKey,
-                deliver: false,
-              }
-              invokeParams.agentId = openclawAgentId
+              // No active session — use HTTP completions endpoint for a synchronous response.
+              // Build conversation history for context (last 20 messages).
+              const historyRows = db
+                .prepare(
+                  `SELECT from_agent, to_agent, content FROM messages
+                   WHERE conversation_id = ? AND workspace_id = ? AND message_type = 'text'
+                     AND id != ?
+                   ORDER BY created_at DESC LIMIT 20`
+                )
+                .all(conversation_id, workspaceId, messageId) as Array<{ from_agent: string; to_agent: string | null; content: string }>
 
-              const invokeResult = await runOpenClaw(
-                [
-                  'gateway',
-                  'call',
-                  'agent',
-                  '--timeout',
-                  '10000',
-                  '--params',
-                  JSON.stringify(invokeParams),
-                  '--json',
-                ],
-                { timeoutMs: 12000 }
+              // Reverse so oldest first, then map to OpenAI roles.
+              const conversationHistory: Array<{ role: 'user' | 'assistant'; content: string }> = [
+                ...historyRows.reverse().map((m) => ({
+                  role: (m.from_agent === 'human' || m.to_agent === (to || '') ? 'user' : 'assistant') as 'user' | 'assistant',
+                  content: m.content,
+                })),
+                { role: 'user' as const, content },
+              ]
+
+              const completionText = await callOpenClawCompletionsHttp(
+                conversationHistory,
+                openclawAgentId,
+                22000,
               )
-              const acceptedPayload = parseGatewayJson(invokeResult.stdout)
-              forwardInfo.delivered = true
+
+              forwardInfo.delivered = completionText !== null
               forwardInfo.session = openclawAgentId || undefined
-              if (typeof acceptedPayload?.runId === 'string' && acceptedPayload.runId) {
-                forwardInfo.runId = acceptedPayload.runId
+
+              if (completionText) {
+                try {
+                  createChatReply(
+                    db,
+                    workspaceId,
+                    conversation_id,
+                    to || 'agent',
+                    from,
+                    completionText,
+                    'text',
+                    null,
+                  )
+                } catch (e) {
+                  logger.error({ err: e }, 'Failed to create HTTP completions reply')
+                }
+              } else {
+                // Emit a visible status message so the user knows delivery was attempted.
+                try {
+                  createChatReply(
+                    db,
+                    workspaceId,
+                    conversation_id,
+                    to || 'agent',
+                    from,
+                    'No active session and the gateway completions endpoint returned no response. Ensure the openclaw gateway is reachable.',
+                    'status',
+                    { status: 'no_response', reason: 'completions_empty' },
+                  )
+                } catch (e) {
+                  logger.error({ err: e }, 'Failed to create no-response status reply')
+                }
               }
             }
           } catch (err) {
