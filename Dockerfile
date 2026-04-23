@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.7
-# ── Stage 0: extraer binario openclaw desde su imagen ──────────
-FROM logstreamingacrpro.azurecr.io/openclaw:2026.4.14-secure-v0.1 AS openclaw-bin
+# ── Stage 0: extraer binario openclaw desde su imagen oficial ──
+FROM ghcr.io/openclaw/openclaw:latest AS openclaw-bin
 
 # ── Stage 1: deps ──────────────────────────────────────────────
 FROM node:22.22.0-slim AS base
